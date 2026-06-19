@@ -1,23 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { getConnectorTiles, ago, connectorRegistry } from "./index";
+import { getConnectors, getConnectorTiles, ago } from "./index";
 
 describe("connector registry", () => {
-  it("every connector list() returns a Result with provenance", async () => {
-    for (const c of connectorRegistry) {
+  it("every connector list() returns a well-formed Result", async () => {
+    for (const c of getConnectors()) {
       const r = await c.list();
-      expect(r.ok).toBe(true);
-      if (r.ok) {
-        expect(r.source).toBe("mock");
-        expect(typeof r.fetchedAt).toBe("number");
-      }
+      expect(typeof r.ok).toBe("boolean");
+      expect(typeof r.fetchedAt).toBe("number");
+      if (r.ok) expect(["live", "mock"]).toContain(r.source);
+      else expect(r.error.code).toBeTruthy();
     }
   });
 
   it("getConnectorTiles summarizes health with epoch timestamps", async () => {
     const tiles = await getConnectorTiles();
-    expect(tiles.length).toBe(connectorRegistry.length);
+    expect(tiles.length).toBe(getConnectors().length);
     expect(tiles.every((t) => typeof t.checkedAt === "number")).toBe(true);
-    expect(tiles.some((t) => t.status === "connected")).toBe(true);
+    expect(tiles.some((t) => t.id === "github")).toBe(true);
   });
 });
 

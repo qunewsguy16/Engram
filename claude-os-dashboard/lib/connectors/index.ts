@@ -1,11 +1,12 @@
 import type { Category, Connector, ConnectorMeta, Health, Result } from "./types";
 import { ok } from "./types";
+import { githubConnector } from "./github";
 
 /**
- * Mock connector registry. Each connector implements the live interface
- * (list returns a Result, plus health) so the degradation path is exercised
- * now — Phase 1 swaps the mock bodies for MCP-backed reads without touching
- * widgets. `summary` is a per-connector one-liner for the status tiles.
+ * Connector registry. The GitHub entry is a real live connector (gated);
+ * the rest are mocks implementing the same interface so the degradation path
+ * is exercised now — Phase 1 swaps each mock body for an MCP/API-backed read
+ * without touching widgets. `summary` is the per-connector status-tile line.
  */
 interface MockItem {
   summary: string;
@@ -31,14 +32,25 @@ function mockConnector(
 
 const MIN = 60_000;
 
-export const connectorRegistry: Connector<MockItem>[] = [
-  mockConnector({ id: "github", name: "GitHub", category: "code" }, "connected", "3 open PRs - 1 needs review", 2 * MIN),
+const mocks: Connector<unknown>[] = [
   mockConnector({ id: "gcal", name: "Google Calendar", category: "calendar" }, "connected", "Next: 1:1 in 45m", 1 * MIN),
   mockConnector({ id: "todoist", name: "Todoist", category: "tasks" }, "connected", "7 due today - 2 overdue", 30_000),
   mockConnector({ id: "gmail", name: "Gmail", category: "mail" }, "connected", "12 unread - 2 flagged", 5 * MIN),
   mockConnector({ id: "engram-rag", name: "Engram RAG", category: "memory" }, "connected", "428 notes indexed", 0),
   mockConnector({ id: "gdrive", name: "Google Drive", category: "notes" }, "disconnected", "Click to connect", 0),
 ];
+
+/** Build the live registry, reading env at call time (not import). */
+export function getConnectors(): Connector<unknown>[] {
+  const enabled =
+    process.env.FEATURE_REAL_CONNECTORS === "true" || process.env.FEATURE_REAL_CONNECTORS === "1";
+  const github = githubConnector({
+    enabled,
+    token: process.env.GITHUB_TOKEN,
+    repo: process.env.GITHUB_REPO,
+  }) as Connector<unknown>;
+  return [github, ...mocks];
+}
 
 export interface ConnectorTile {
   id: string;
@@ -49,10 +61,10 @@ export interface ConnectorTile {
   checkedAt: number;
 }
 
-/** Health summaries for the Connectors widget. */
+/** Health summaries for the Connectors footer. */
 export async function getConnectorTiles(): Promise<ConnectorTile[]> {
   return Promise.all(
-    connectorRegistry.map(async (c) => {
+    getConnectors().map(async (c) => {
       const h = await c.health();
       return {
         id: c.meta.id,
