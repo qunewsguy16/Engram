@@ -1,6 +1,7 @@
 import { Target, Sun, Sparkles, AlertCircle } from "lucide-react";
 import { profile, habitStats } from "@/lib/profile";
 import { today } from "@/lib/today";
+import { OneThingStatus } from "@/components/OneThingStatus";
 
 export function Today() {
   return (
@@ -20,6 +21,7 @@ export function Today() {
               <>Edit this in <span className="font-mono">lib/today.ts</span> until /dream sets it</>
             )}
           </div>
+          <OneThingStatus />
         </div>
         <div className="text-right flex-none">
           <div className="text-xs text-muted">Focus block</div>
