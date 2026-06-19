@@ -6,6 +6,7 @@ import { Connectors } from "@/components/widgets/Connectors";
 import { Projects } from "@/components/widgets/Projects";
 import { Learning } from "@/components/widgets/Learning";
 import { TasksCalendar } from "@/components/widgets/TasksCalendar";
+import { Inbox } from "@/components/widgets/Inbox";
 
 export default function Page() {
   return (
@@ -18,6 +19,7 @@ export default function Page() {
           <Projects />
         </div>
         <aside className="col-span-12 lg:col-span-4 space-y-4">
+          <Inbox />
           <Memory />
           <Learning />
           <Connectors />

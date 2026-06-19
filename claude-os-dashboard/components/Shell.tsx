@@ -1,4 +1,4 @@
-import { Command, Sparkles } from "lucide-react";
+import { QuickCapture } from "./QuickCapture";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const today = new Date().toLocaleDateString(undefined, {
@@ -21,12 +21,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="btn">
-              <Command size={14} /> <span className="kbd">K</span>
-            </button>
-            <button className="btn-primary">
-              <Sparkles size={14} /> /dream
-            </button>
+            <QuickCapture />
           </div>
         </div>
       </header>
