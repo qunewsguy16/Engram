@@ -1,6 +1,7 @@
 import type { Category, Connector, ConnectorMeta, Health, Result } from "./types";
 import { ok } from "./types";
 import { githubConnector, type GithubSnapshot } from "./github";
+import { flag } from "../flags";
 
 /**
  * Connector registry. The GitHub entry is a real live connector (gated);
@@ -41,9 +42,11 @@ const mocks: Connector<unknown>[] = [
 ];
 
 function makeGithub() {
-  const enabled =
-    process.env.FEATURE_REAL_CONNECTORS === "true" || process.env.FEATURE_REAL_CONNECTORS === "1";
-  return githubConnector({ enabled, token: process.env.GITHUB_TOKEN, repo: process.env.GITHUB_REPO });
+  return githubConnector({
+    enabled: flag("FEATURE_REAL_CONNECTORS"),
+    token: process.env.GITHUB_TOKEN,
+    repo: process.env.GITHUB_REPO,
+  });
 }
 
 /** Build the live registry, reading env at call time (not import). */
