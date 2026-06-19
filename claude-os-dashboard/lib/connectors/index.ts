@@ -1,6 +1,6 @@
 import type { Category, Connector, ConnectorMeta, Health, Result } from "./types";
 import { ok } from "./types";
-import { githubConnector } from "./github";
+import { githubConnector, type GithubSnapshot } from "./github";
 
 /**
  * Connector registry. The GitHub entry is a real live connector (gated);
@@ -40,16 +40,21 @@ const mocks: Connector<unknown>[] = [
   mockConnector({ id: "gdrive", name: "Google Drive", category: "notes" }, "disconnected", "Click to connect", 0),
 ];
 
-/** Build the live registry, reading env at call time (not import). */
-export function getConnectors(): Connector<unknown>[] {
+function makeGithub() {
   const enabled =
     process.env.FEATURE_REAL_CONNECTORS === "true" || process.env.FEATURE_REAL_CONNECTORS === "1";
-  const github = githubConnector({
-    enabled,
-    token: process.env.GITHUB_TOKEN,
-    repo: process.env.GITHUB_REPO,
-  }) as Connector<unknown>;
-  return [github, ...mocks];
+  return githubConnector({ enabled, token: process.env.GITHUB_TOKEN, repo: process.env.GITHUB_REPO });
+}
+
+/** Build the live registry, reading env at call time (not import). */
+export function getConnectors(): Connector<unknown>[] {
+  return [makeGithub() as Connector<unknown>, ...mocks];
+}
+
+/** Typed accessor for widgets that want live GitHub data; null when off/erroring. */
+export async function githubSnapshot(): Promise<GithubSnapshot | null> {
+  const r = await makeGithub().list();
+  return r.ok && r.data[0] ? r.data[0] : null;
 }
 
 export interface ConnectorTile {
