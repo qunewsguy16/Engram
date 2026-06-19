@@ -4,81 +4,99 @@ Personal command center for code, learning, and daily focus. Tailored around
 **learn AI/ML deeper**, **ship side projects**, and **daily focus / habits**.
 
 Built as a sibling project inside the Engram repo so it can be split out later
-(`git subtree split` / move to its own repo). v1 runs entirely off mocked data
-with a clean adapter layer so real integrations drop in.
+(`git subtree split` / move to its own repo). It runs locally; external
+integrations are gated behind feature flags and fall back to mock/local data
+so it's fully usable with zero credentials.
 
 > **Roadmap, scope, and the rationale behind every major choice live in
 > [`DECISIONS.md`](./DECISIONS.md)** — read it before adding features. The plan
-> is deliberately capped to avoid the dashboard eating the goals it serves.
+> is deliberately capped (and resequenced) to avoid the dashboard eating the
+> goals it serves.
 
 ## Run
 
 ```bash
 cd claude-os-dashboard
 npm install
-npm run dev
-# open http://localhost:3000
+npm run dev        # http://localhost:3000
+npm test           # vitest (64 unit tests)
+npm run typecheck  # tsc --noEmit
+npm run build      # next build
 ```
 
-## Layout
+## The daily loop
 
-Two-column dashboard with seven widgets:
+The point of the dashboard is a loop, not a screen:
 
-| Widget | What it shows | Where data lives |
+1. **Morning** — open it; **Today** shows the single *one thing* that matters
+   and your honest habit rates. `/dream` consolidates yesterday's signals
+   (commits, tasks, captures, learnings) into one grounded focus + proposals.
+2. **All day** — `⌘⇧N` quick-capture anything into the **Inbox**; **Up next**
+   shows the live next event + today's priorities.
+3. **Night** — `⌘⇧R` end-of-day **review**: did the one thing get done? what did
+   you learn? Those entries feed tomorrow's `/dream`.
+
+| Shortcut | Action |
+|---|---|
+| `⌘⇧N` / `Ctrl⇧N` | Quick capture |
+| `⌘⇧R` / `Ctrl⇧R` | End-of-day review |
+| `⌘↵` / `Esc` | Save / cancel in a modal |
+
+## Widgets
+
+| Widget | What it does | Source |
 |---|---|---|
-| **Today** | One-sentence definition of a winning day, focus block, habit streaks, active goals | `lib/profile.ts` |
-| **/dream** | Click to consolidate yesterday's commits, notes, tasks into insights + suggested actions | `app/api/dream/route.ts` (v1 deterministic; swap to Claude API) |
-| **Tasks & Calendar** | Today's Todoist tasks + Google Calendar agenda on one timeline | `lib/data/tasks.ts` |
-| **Projects** | Engram + side projects with branch, open PRs, top TODOs, next milestone | `lib/data/projects.ts` |
-| **Memory & Context** | Live search over your notes / RAG corpus, pinnable | `lib/data/memory.ts`, `app/api/memory/search/route.ts` |
-| **Learning** | Reading queue (papers, courses) + spaced-repetition concept queue | `lib/data/learning.ts` |
-| **Connectors** | Status tiles for GitHub, Gmail, Calendar, Notion, Todoist, Engram RAG, Drive | `lib/connectors/index.ts` |
+| **Today** | One thing above the fold; habits as honest *rate* (not fragile streaks), atRisk on 2 misses in a row | `lib/today.ts`, `lib/profile.ts` |
+| **/dream** | Consolidates yesterday into one focus + grounded threads + typed action proposals (click → sent to inbox) | `app/actions/dream.ts`, `lib/ai/*` |
+| **Up next** | Live current/next event + countdown; today's p1/p2 priorities (no Todoist mirror) | `lib/agenda.ts`, `lib/data/tasks.ts` |
+| **Projects** | Side projects; live PR count from the GitHub connector when enabled, else mock | `lib/data/projects.ts`, `lib/connectors/github.ts` |
+| **Inbox** | Quick-capture items with one-click triage (pin / archive) | `lib/inbox.ts` |
+| **Memory** | Search notes; keyword by default, semantic (cosine) behind a flag | `app/api/memory/search/route.ts`, `lib/memorySearch.ts` |
+| **Learning** | Reading queue; a paper isn't *done* until you write an own-words takeaway, which becomes a concept | `lib/learningProgress.ts`, `lib/data/learning.ts` |
+| **Connectors** (footer) | Quiet health strip | `lib/connectors/index.ts` |
 
 ## Architecture
 
 ```
 app/
-  page.tsx                 # dashboard grid
-  layout.tsx
-  globals.css              # tailwind + small design tokens
-  api/
-    dream/route.ts         # POST /api/dream  -> consolidation output
-    memory/search/route.ts # GET  /api/memory/search?q=...
+  page.tsx                 # grid + onboarding + connectors footer
+  actions/dream.ts         # server action: /dream (mutations are actions, not routes)
+  api/memory/search/route.ts
 components/
-  Shell.tsx                # header, kbd hint, /dream button
+  Shell, QuickCapture, DailyReview, Onboarding, ConnectorsFooter
   widgets/                 # one file per widget
 lib/
-  connectors/              # ConnectorMeta interface + stub registry
-  data/                    # mocked domain data (projects, tasks, memory...)
-  profile.ts               # your name, goals, habits
-  cn.ts
+  ai/                      # schema (DreamSchema), reduce, dream, client, embeddings
+  connectors/              # Result<T> + health(); github (live) + mocks
+  data/                    # mock domain data
+  localStore.ts            # generic localStorage store (inbox/review/learning)
+  inbox / review / learningProgress / agenda / memorySearch / profile / today / config / log
 ```
 
-## Wiring real integrations (next steps)
+### Conventions
+- **Adapter-first:** widgets never import SDKs; everything goes through `lib/*`.
+- **Mutations are server actions**, not public routes.
+- **Connectors return `Result<T>`** (live/mock provenance, errors) + `health()`,
+  so graceful degradation is built in.
+- **Feature flags** (`lib/config.ts`): `FEATURE_REAL_CONNECTORS`,
+  `FEATURE_DREAM_LIVE`, `FEATURE_MEMORY_EMBEDDINGS` — all off by default.
+- **Local-first:** persistence is localStorage for now; SQLite is deferred
+  until a feature needs it (see `DECISIONS.md`).
 
-The adapter layer is intentionally thin so each connector can be wired
-independently. All MCP servers listed below are already available in your
-environment.
+## Going live (flip a flag + add a key)
 
-1. **/dream -> Claude API.** Replace the mocked response in `app/api/dream/route.ts`
-   with an Anthropic SDK call. See the `claude-api` skill for a caching-friendly
-   pattern. Inputs: yesterday's commits (GitHub MCP), completed tasks
-   (Todoist MCP), edited notes (Notion MCP), reading history (`lib/data/learning.ts`).
-2. **GitHub connector.** Replace `lib/connectors/index.ts` GitHub entry with a
-   server action that calls `mcp__github__list_pull_requests` and `list_commits`.
-3. **Calendar + Tasks.** Server actions hitting `google_calendar_find_events`
-   and `find-tasks` (Todoist MCP). Replace `lib/data/tasks.ts` with a fetch.
-4. **Memory search -> embeddings.** Swap the substring matcher in
-   `app/api/memory/search/route.ts` for brute-force cosine over stored
-   Float32 embeddings (sufficient at this corpus size); add `sqlite-vec`
-   only if/when brute force is too slow. Notes live as markdown under
-   `data/notes/`.
-5. **Engram RAG.** Point the "Engram RAG" connector at the Engram demo's
-   memory store so the dashboard can query consolidated memories.
+| To enable | Set |
+|---|---|
+| `/dream` via Claude | `ANTHROPIC_API_KEY`, `FEATURE_DREAM_LIVE=true` (model `claude-opus-4-8`) |
+| Semantic memory search | `EMBEDDING_API_KEY`, `FEATURE_MEMORY_EMBEDDINGS=true` |
+| Live GitHub in Projects/footer | `GITHUB_TOKEN` (+ `GITHUB_REPO`), `FEATURE_REAL_CONNECTORS=true` |
+
+Each remaining connector (Calendar, Todoist, Gmail, Notion, Drive) follows the
+`lib/connectors/github.ts` exemplar: gate on the flag + a credential, return
+`Result`, never throw in `health()`.
 
 ## Tailoring
 
-- Edit `lib/profile.ts` to change goals, habits, focus.
-- Edit `app/page.tsx` to rearrange the grid (left vs right column).
-- Each widget is one self-contained file in `components/widgets/`; delete what
-  you don't want, add new ones the same way.
+- `lib/profile.ts` — goals, habits. `lib/today.ts` — the one thing + focus block.
+- `app/page.tsx` — rearrange the grid.
+- Each widget is one self-contained file in `components/widgets/`.

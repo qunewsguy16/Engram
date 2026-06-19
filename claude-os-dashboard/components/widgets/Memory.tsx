@@ -7,6 +7,7 @@ import type { MemoryNote } from "@/lib/data/memory";
 export function Memory() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<MemoryNote[]>([]);
+  const [mode, setMode] = useState<string>("keyword");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,6 +21,7 @@ export function Memory() {
         if (!res.ok) throw new Error(`search failed (${res.status})`);
         const json = await res.json();
         setResults(Array.isArray(json?.results) ? json.results : []);
+        if (json?.mode) setMode(json.mode);
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
           setError("Search unavailable.");
@@ -40,7 +42,7 @@ export function Memory() {
     <section className="card card-pad">
       <div className="flex items-center justify-between">
         <div className="section-title"><Brain size={12} /> Memory & Context</div>
-        <span className="chip">RAG over local notes</span>
+        <span className="chip" title="Retrieval mode (set FEATURE_MEMORY_EMBEDDINGS for semantic)">{mode}</span>
       </div>
 
       <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-bg/50 px-3 py-2">
