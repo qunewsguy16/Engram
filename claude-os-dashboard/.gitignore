@@ -3,7 +3,17 @@ node_modules
 out
 .DS_Store
 *.log
-.env*.local
+
+# Secrets: ignore every .env variant except the committed example.
+.env
+.env.*
+!.env.example
+
+# Local database + any embeddings index (never commit personal data).
+/data/*.sqlite
+/data/*.sqlite-*
+/data/*.db
+
 next-env.d.ts
 tsconfig.tsbuildinfo
 .vercel

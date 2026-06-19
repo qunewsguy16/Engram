@@ -65,8 +65,10 @@ environment.
 3. **Calendar + Tasks.** Server actions hitting `google_calendar_find_events`
    and `find-tasks` (Todoist MCP). Replace `lib/data/tasks.ts` with a fetch.
 4. **Memory search -> embeddings.** Swap the substring matcher in
-   `app/api/memory/search/route.ts` for an embeddings index (e.g. sqlite-vss
-   or pgvector). Notes can live as markdown under `data/notes/`.
+   `app/api/memory/search/route.ts` for brute-force cosine over stored
+   Float32 embeddings (sufficient at this corpus size); add `sqlite-vec`
+   only if/when brute force is too slow. Notes live as markdown under
+   `data/notes/`.
 5. **Engram RAG.** Point the "Engram RAG" connector at the Engram demo's
    memory store so the dashboard can query consolidated memories.
 
