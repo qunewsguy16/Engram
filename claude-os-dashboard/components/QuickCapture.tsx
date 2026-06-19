@@ -49,6 +49,9 @@ export function QuickCapture() {
           onClick={() => setOpen(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Quick capture"
             className="card w-full max-w-xl"
             onClick={(e) => e.stopPropagation()}
           >

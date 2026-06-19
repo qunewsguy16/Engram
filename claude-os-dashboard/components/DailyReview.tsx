@@ -73,7 +73,13 @@ export function DailyReview() {
           className="fixed inset-0 z-50 bg-ink/20 backdrop-blur-sm grid place-items-start pt-[12vh] px-4"
           onClick={() => setOpen(false)}
         >
-          <div className="card card-pad w-full max-w-lg space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="End-of-day review"
+            className="card card-pad w-full max-w-lg space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="section-title"><Moon size={12} /> End-of-day review</div>
 
             <div>
