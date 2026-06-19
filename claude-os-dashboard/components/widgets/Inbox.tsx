@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Inbox as InboxIcon, Archive, Pin } from "lucide-react";
-import { listInbox, setStatus, ago, type Capture } from "@/lib/inbox";
+import { listInbox, setStatus, subscribeInbox, ago, type Capture } from "@/lib/inbox";
 
 export function Inbox() {
   const [items, setItems] = useState<Capture[]>([]);
@@ -11,12 +11,7 @@ export function Inbox() {
     const sync = () => setItems(listInbox());
     sync();
     // Re-render when another tab/component captures or triages.
-    window.addEventListener("inbox:changed", sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener("inbox:changed", sync);
-      window.removeEventListener("storage", sync);
-    };
+    return subscribeInbox(sync);
   }, []);
 
   return (

@@ -1,4 +1,5 @@
 import { QuickCapture } from "./QuickCapture";
+import { DailyReview } from "./DailyReview";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const today = new Date().toLocaleDateString(undefined, {
@@ -21,6 +22,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <DailyReview />
             <QuickCapture />
           </div>
         </div>

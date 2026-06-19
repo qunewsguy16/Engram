@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { Sparkles, ArrowRight, Loader2, Target } from "lucide-react";
 import { generateDream } from "@/app/actions/dream";
+import { recentCaptureTexts } from "@/lib/inbox";
+import { listRecentReviews } from "@/lib/review";
 import type { Dream, SuggestedAction } from "@/lib/ai/schema";
 
 function actionLabel(a: SuggestedAction): string {
@@ -21,7 +23,10 @@ export function Dream() {
   const [pending, start] = useTransition();
 
   function run() {
-    start(async () => setData(await generateDream()));
+    // Feed the loop: recent captures + review learnings inform the dream.
+    const captures = recentCaptureTexts(10);
+    const learnings = listRecentReviews(5).map((r) => r.learned).filter(Boolean);
+    start(async () => setData(await generateDream({ captures, learnings })));
   }
 
   const dream = data?.dream;

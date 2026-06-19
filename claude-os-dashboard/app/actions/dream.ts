@@ -8,16 +8,32 @@ import { projects } from "@/lib/data/projects";
 import { reading } from "@/lib/data/learning";
 
 /**
+ * Client-side signals the browser passes in (localStorage isn't visible to the
+ * server). This is what closes the loop: yesterday's captures and review
+ * learnings inform today's dream.
+ */
+export interface ClientSignals {
+  captures?: string[];
+  learnings?: string[];
+}
+
+/**
  * Server action for /dream. Mutations/AI calls run server-side (no public
- * token-spending endpoint, CSRF-safe, progressive-enhancement friendly).
- *
- * v1 assembles the signal blob from local mock data; Phase 1 swaps these for
+ * token-spending endpoint). v1 assembles the blob from local mock data plus
+ * the client's recent captures/learnings; Phase 1 swaps the mock sources for
  * MCP-backed reads (yesterday's commits, completed tasks, edited notes).
  */
-export async function generateDream(): Promise<{ dream: Dream; source: "live" | "mock" }> {
+export async function generateDream(client?: ClientSignals): Promise<{ dream: Dream; source: "live" | "mock" }> {
+  const captureNotes = (client?.captures ?? []).map((t) => ({ title: t }));
+  const learningNotes = (client?.learnings ?? []).map((t) => ({ title: `Learned: ${t}` }));
+
   const raw: RawSignals = {
     tasks: tasks.filter((t) => t.due === "today").map((t) => ({ content: t.content })),
-    notes: projects.flatMap((p) => p.todos.map((td) => ({ title: `${p.name}: ${td}` }))),
+    notes: [
+      ...learningNotes,
+      ...captureNotes,
+      ...projects.flatMap((p) => p.todos.map((td) => ({ title: `${p.name}: ${td}` }))),
+    ],
     calendar: events.map((e) => ({ title: e.title, at: e.start })),
     reading: reading.map((r) => ({ title: r.title })),
   };
