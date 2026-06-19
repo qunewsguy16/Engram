@@ -30,7 +30,7 @@ export const DREAM_SYSTEM_PROMPT = [
   "Respond with ONLY a JSON object matching the requested schema, no prose.",
 ].join("\n");
 
-function extractJson(text: string): unknown {
+export function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = fenced ? fenced[1] : text;
   const start = raw.indexOf("{");
