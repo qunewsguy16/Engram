@@ -7,6 +7,10 @@ Built as a sibling project inside the Engram repo so it can be split out later
 (`git subtree split` / move to its own repo). v1 runs entirely off mocked data
 with a clean adapter layer so real integrations drop in.
 
+> **Roadmap, scope, and the rationale behind every major choice live in
+> [`DECISIONS.md`](./DECISIONS.md)** — read it before adding features. The plan
+> is deliberately capped to avoid the dashboard eating the goals it serves.
+
 ## Run
 
 ```bash

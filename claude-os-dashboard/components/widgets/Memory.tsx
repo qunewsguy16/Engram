@@ -1,20 +1,39 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Brain, Pin, Search } from "lucide-react";
+import { Brain, Pin, Search, Loader2 } from "lucide-react";
 import type { MemoryNote } from "@/lib/data/memory";
 
 export function Memory() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<MemoryNote[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const ctrl = new AbortController();
     const t = setTimeout(async () => {
-      const res = await fetch(`/api/memory/search?q=${encodeURIComponent(q)}`);
-      const json = await res.json();
-      setResults(json.results);
-    }, 100);
-    return () => clearTimeout(t);
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/memory/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
+        if (!res.ok) throw new Error(`search failed (${res.status})`);
+        const json = await res.json();
+        setResults(Array.isArray(json?.results) ? json.results : []);
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          setError("Search unavailable.");
+          setResults([]);
+        }
+      } finally {
+        // Only the latest (non-aborted) request clears loading.
+        if (!ctrl.signal.aborted) setLoading(false);
+      }
+    }, 150);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
   }, [q]);
 
   return (
@@ -32,10 +51,12 @@ export function Memory() {
           placeholder="Search notes, papers, commits..."
           className="w-full bg-transparent outline-none text-sm"
         />
+        {loading && <Loader2 size={14} className="animate-spin text-muted" />}
       </div>
 
       <div className="mt-3 space-y-2 max-h-72 overflow-auto">
-        {results.map((n) => (
+        {error && <div className="text-sm text-red-500 py-6 text-center">{error}</div>}
+        {!error && results.map((n) => (
           <div key={n.id} className="rounded-lg border border-border p-3 hover:bg-bg/40 transition-colors">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -55,7 +76,7 @@ export function Memory() {
             </div>
           </div>
         ))}
-        {results.length === 0 && (
+        {!error && !loading && results.length === 0 && (
           <div className="text-sm text-muted py-6 text-center">No matches.</div>
         )}
       </div>
