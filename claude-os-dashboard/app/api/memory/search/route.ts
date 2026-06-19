@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { memory } from "@/lib/data/memory";
+import { keywordSearch, semanticSearch } from "@/lib/memorySearch";
+import { openaiEmbedder } from "@/lib/ai/embeddings";
+
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  const q = (req.nextUrl.searchParams.get("q") || "").toLowerCase().trim();
-  if (!q) return NextResponse.json({ results: memory });
+  const q = (req.nextUrl.searchParams.get("q") || "").trim();
+  if (!q) return NextResponse.json({ results: memory, mode: "all" });
 
-  const results = memory
-    .map((n) => {
-      const hay = `${n.title} ${n.snippet} ${n.tags.join(" ")} ${n.source}`.toLowerCase();
-      const score = q.split(/\s+/).reduce((s, term) => (hay.includes(term) ? s + 1 : s), 0);
-      return { note: n, score };
-    })
-    .filter((r) => r.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map((r) => r.note);
+  const embeddingsOn =
+    process.env.FEATURE_MEMORY_EMBEDDINGS === "true" || process.env.FEATURE_MEMORY_EMBEDDINGS === "1";
+  const key = process.env.EMBEDDING_API_KEY;
 
-  return NextResponse.json({ results });
+  if (embeddingsOn && key) {
+    try {
+      const results = await semanticSearch(memory, q, openaiEmbedder(key));
+      return NextResponse.json({ results, mode: "semantic" });
+    } catch {
+      // Fall back to keyword on any embeddings error — never fail the search.
+    }
+  }
+
+  return NextResponse.json({ results: keywordSearch(memory, q), mode: "keyword" });
 }

@@ -50,6 +50,27 @@ export async function contentHash(text: string): Promise<string> {
 }
 
 /**
+ * Real embedder: OpenAI text-embedding-3-small via fetch (no SDK dependency).
+ * Used when FEATURE_MEMORY_EMBEDDINGS is on and EMBEDDING_API_KEY is set.
+ */
+export function openaiEmbedder(apiKey: string): Embedder {
+  return {
+    model: EMBEDDING_MODEL,
+    dim: EMBEDDING_DIM,
+    async embed(texts: string[]): Promise<Float32Array[]> {
+      const res = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: EMBEDDING_MODEL, input: texts }),
+      });
+      if (!res.ok) throw new Error(`embeddings failed (${res.status})`);
+      const json = (await res.json()) as { data: { embedding: number[] }[] };
+      return json.data.map((d) => Float32Array.from(d.embedding));
+    },
+  };
+}
+
+/**
  * Deterministic zero-cost stub used until FEATURE_MEMORY_EMBEDDINGS is on.
  * Returns reproducible pseudo-vectors so the pipeline + tests run with no key.
  */
