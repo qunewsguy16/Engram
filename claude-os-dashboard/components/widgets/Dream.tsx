@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Sparkles, ArrowRight, Loader2, Target } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, Target, Check } from "lucide-react";
 import { generateDream } from "@/app/actions/dream";
-import { recentCaptureTexts } from "@/lib/inbox";
+import { recentCaptureTexts, capture } from "@/lib/inbox";
 import { listRecentReviews } from "@/lib/review";
 import type { Dream, SuggestedAction } from "@/lib/ai/schema";
 
@@ -20,13 +20,22 @@ function actionLabel(a: SuggestedAction): string {
 
 export function Dream() {
   const [data, setData] = useState<{ dream: Dream; source: "live" | "mock" } | null>(null);
+  const [sent, setSent] = useState<Set<number>>(new Set());
   const [pending, start] = useTransition();
 
   function run() {
     // Feed the loop: recent captures + review learnings inform the dream.
     const captures = recentCaptureTexts(10);
     const learnings = listRecentReviews(5).map((r) => r.learned).filter(Boolean);
+    setSent(new Set());
     start(async () => setData(await generateDream({ captures, learnings })));
+  }
+
+  // Safe, reversible execution: send the proposal to the inbox. No external
+  // writes auto-run — the user triages from there (human-in-the-loop gate).
+  function acceptAction(a: SuggestedAction, i: number) {
+    capture(`${actionLabel(a)} #dream`);
+    setSent((prev) => new Set(prev).add(i));
   }
 
   const dream = data?.dream;
@@ -76,12 +85,22 @@ export function Dream() {
             <div>
               <div className="section-title mt-4">Suggested actions</div>
               <div className="mt-2 flex flex-wrap gap-2">
-                {dream.suggestedActions.map((a, i) => (
-                  // Proposals only — execution is an explicit, confirmed click (never auto-run).
-                  <button key={i} className="btn text-xs" title="Review and confirm">
-                    {actionLabel(a)} <ArrowRight size={12} />
-                  </button>
-                ))}
+                {dream.suggestedActions.map((a, i) =>
+                  sent.has(i) ? (
+                    <span key={i} className="chip text-xs text-emerald-600 border-emerald-300">
+                      <Check size={12} /> Sent to inbox
+                    </span>
+                  ) : (
+                    <button
+                      key={i}
+                      onClick={() => acceptAction(a, i)}
+                      className="btn text-xs"
+                      title="Send this proposal to your inbox"
+                    >
+                      {actionLabel(a)} <ArrowRight size={12} />
+                    </button>
+                  ),
+                )}
               </div>
             </div>
           )}

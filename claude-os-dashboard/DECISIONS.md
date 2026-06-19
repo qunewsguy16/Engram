@@ -4,6 +4,30 @@ A judge-orchestrated panel (architecture, AI/RAG, product/behavioral lenses)
 audited the original 8-phase "build to completion" plan against the code. This
 records the decisions that came out of it so the rationale isn't lost.
 
+## Status (built so far)
+
+Phase 0 hardening complete; the daily loop and several corrections are in.
+All slices ship with unit tests (64 passing) and green CI on PR #1.
+
+- ✅ Foundation: stable React 19/Next 15.5, zero-dep logger, strict flag
+  parsing, secret/DB gitignore, Vitest + GitHub Actions CI.
+- ✅ AI contract (`lib/ai/*`): zod `DreamSchema` (grounded, typed actions),
+  pure-TS reducer, embeddings interface + BLOB helpers + real `openaiEmbedder`,
+  lazy Anthropic client (`claude-opus-4-8`), `runDream` with mock fallback.
+- ✅ Connectors: `Result<T>` + `health()`; real GitHub connector exemplar
+  (gated), mocks for the rest; demoted to a footer.
+- ✅ Daily loop: Today one-thing + rate-based habits; quick capture (⌘⇧N) +
+  inbox; end-of-day review (⌘⇧R) with streak; `/dream` consumes captures +
+  learnings; dream actions send to inbox (human-in-the-loop).
+- ✅ Agenda: live "Up next" + priorities (no Todoist mirror).
+- ✅ Learning: takeaway-gated completion; takeaways become concepts.
+- ✅ Memory: semantic (brute-force cosine) path behind the flag, keyword default.
+- ✅ First-run onboarding checklist.
+
+Not yet built (next): live wiring of the remaining connectors (needs the app
+to hold credentials at runtime), SQLite persistence (stores are localStorage),
+live `/dream` (flag off; mock until a key is set), goal-weighting flag.
+
 ## Verdict in one line
 
 The foundation (mock-first adapters, RSC-default, typed seams, flags-before-
