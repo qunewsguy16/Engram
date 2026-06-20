@@ -1,58 +1,64 @@
+import "server-only";
+import { getDb } from "./db";
+import { parseCapture } from "./parseCapture";
+import type { Capture } from "./inboxTypes";
+
+export { parseCapture };
+export { ago, type Capture } from "./inboxTypes";
+
 /**
- * Quick-capture inbox. Persistence + reactivity come from the shared
- * localStore (DB deferred per DECISIONS.md). The Capture shape and parse
- * helpers are stable; swapping the backing store is one line.
+ * Quick-capture inbox, SQLite-backed. Pure parser stays for client use; all
+ * I/O is server-only. Widgets call these from RSC; modals/buttons mutate via
+ * server actions (app/actions/inbox.ts).
  */
-import { createLocalStore, uid, ago } from "./localStore";
 
-export { ago };
-
-export interface Capture {
+interface CaptureRow {
   id: string;
   text: string;
-  tags: string[];
-  capturedAt: number; // epoch ms
-  status: "inbox" | "archived" | "promoted";
+  tags: string;
+  captured_at: number;
+  status: Capture["status"];
 }
 
-const store = createLocalStore<Capture>("engram-os:inbox:v1");
+function rowToCapture(r: CaptureRow): Capture {
+  return { id: r.id, text: r.text, tags: JSON.parse(r.tags), capturedAt: r.captured_at, status: r.status };
+}
 
-/** Pull #tags out of the raw text and return both. */
-export function parseCapture(raw: string): { text: string; tags: string[] } {
-  const tags: string[] = [];
-  for (const m of raw.matchAll(/(?:^|\s)#([a-z0-9][\w-]{0,40})/gi)) tags.push(m[1].toLowerCase());
-  const text = raw.replace(/(?:^|\s)#[a-z0-9][\w-]{0,40}/gi, "").trim().replace(/\s+/g, " ");
-  return { text, tags: Array.from(new Set(tags)) };
+function uid(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function listInbox(): Capture[] {
-  return store
-    .all()
-    .filter((c) => c.status === "inbox")
-    .sort((a, b) => b.capturedAt - a.capturedAt);
+  const rows = getDb()
+    .prepare<[], CaptureRow>(
+      `SELECT id, text, tags, captured_at, status FROM captures
+       WHERE status = 'inbox' ORDER BY captured_at DESC, rowid DESC`,
+    )
+    .all();
+  return rows.map(rowToCapture);
 }
 
 /** Recent capture texts (any status) for feeding into /dream. */
 export function recentCaptureTexts(limit = 10): string[] {
-  return store
-    .all()
-    .sort((a, b) => b.capturedAt - a.capturedAt)
-    .slice(0, limit)
-    .map((c) => c.text);
+  const rows = getDb()
+    .prepare<[number], { text: string }>(
+      `SELECT text FROM captures ORDER BY captured_at DESC, rowid DESC LIMIT ?`,
+    )
+    .all(limit);
+  return rows.map((r) => r.text);
 }
 
 export function capture(raw: string): Capture | null {
   const { text, tags } = parseCapture(raw);
   if (!text) return null;
   const item: Capture = { id: uid(), text, tags, capturedAt: Date.now(), status: "inbox" };
-  store.set([item, ...store.all()]);
+  getDb()
+    .prepare(`INSERT INTO captures (id, text, tags, captured_at, status) VALUES (?, ?, ?, ?, ?)`)
+    .run(item.id, item.text, JSON.stringify(item.tags), item.capturedAt, item.status);
   return item;
 }
 
-export function setStatus(id: string, status: Capture["status"]) {
-  store.set(store.all().map((c) => (c.id === id ? { ...c, status } : c)));
+export function setStatus(id: string, status: Capture["status"]): void {
+  getDb().prepare(`UPDATE captures SET status = ? WHERE id = ?`).run(status, id);
 }
 
-export function subscribeInbox(fn: () => void): () => void {
-  return store.subscribe(fn);
-}

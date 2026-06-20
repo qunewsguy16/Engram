@@ -1,13 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { installLocalStorageShim, resetLocalStorage } from "../test/stubs/localstorage";
-
-installLocalStorageShim();
+import { describe, it, expect } from "vitest";
+import { useTestDb } from "../test/stubs/db";
 
 import { saveReview, getReview, reviewStreak, listRecentReviews, todayKey } from "./review";
 
-beforeEach(() => resetLocalStorage());
-
 describe("review store", () => {
+  useTestDb();
+
   it("upserts one entry per day (no duplicates)", () => {
     saveReview({ oneThingDone: false, learned: "first" });
     saveReview({ oneThingDone: true, learned: "amended" });

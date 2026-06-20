@@ -1,23 +1,15 @@
-"use client";
-
 import { CalendarRange, CheckCircle2, Sparkles } from "lucide-react";
-import { listRecentReviews, subscribeReviews } from "@/lib/review";
-import { completedTakeaways, subscribeLearning } from "@/lib/learningProgress";
+import { listRecentReviews } from "@/lib/review";
+import { completedTakeaways } from "@/lib/learningProgress";
 import { profile } from "@/lib/profile";
 import { buildWeeklyDigest } from "@/lib/weekly";
-import { useStoreSync } from "@/lib/useStoreSync";
 
-function compute() {
-  return buildWeeklyDigest(
+export function WeeklyDigest() {
+  const digest = buildWeeklyDigest(
     listRecentReviews(7),
     completedTakeaways(),
     profile.habits.map((h) => ({ label: h.label, log: h.log })),
   );
-}
-
-export function WeeklyDigest() {
-  useStoreSync(subscribeReviews, subscribeLearning);
-  const digest = compute();
   const empty = digest.daysReviewed === 0;
 
   return (

@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { Sparkles, ArrowRight, Loader2, Target, Check } from "lucide-react";
 import { generateDream } from "@/app/actions/dream";
-import { recentCaptureTexts, capture } from "@/lib/inbox";
-import { listRecentReviews } from "@/lib/review";
+import { captureAction } from "@/app/actions/inbox";
 import type { Dream, SuggestedAction } from "@/lib/ai/schema";
 
 function actionLabel(a: SuggestedAction): string {
@@ -24,18 +23,18 @@ export function Dream() {
   const [pending, start] = useTransition();
 
   function run() {
-    // Feed the loop: recent captures + review learnings inform the dream.
-    const captures = recentCaptureTexts(10);
-    const learnings = listRecentReviews(5).map((r) => r.learned).filter(Boolean);
+    // The server action reads captures + review learnings directly from SQLite.
     setSent(new Set());
-    start(async () => setData(await generateDream({ captures, learnings })));
+    start(async () => setData(await generateDream()));
   }
 
   // Safe, reversible execution: send the proposal to the inbox. No external
   // writes auto-run — the user triages from there (human-in-the-loop gate).
   function acceptAction(a: SuggestedAction, i: number) {
-    capture(`${actionLabel(a)} #dream`);
-    setSent((prev) => new Set(prev).add(i));
+    start(async () => {
+      await captureAction(`${actionLabel(a)} #dream`);
+      setSent((prev) => new Set(prev).add(i));
+    });
   }
 
   const dream = data?.dream;

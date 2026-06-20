@@ -1,14 +1,14 @@
-/**
- * Per-item learning progress, layered over the mock reading list.
- *
- * The loop fix (Product audit #5): reading is intake; learning happens on
- * output. A paper cannot be marked "done" without an own-words takeaway, and
- * that takeaway — not an auto-summary — is what becomes a concept to revisit.
- * Stored locally (DB deferred); overrides merge onto lib/data/learning.ts.
- */
-import { createLocalStore } from "./localStore";
+import "server-only";
+import { getDb } from "./db";
+import { canComplete, type ReadStatus } from "./learningTypes";
 
-export type ReadStatus = "queued" | "reading" | "done";
+export { MIN_TAKEAWAY, canComplete, type ReadStatus } from "./learningTypes";
+
+/**
+ * Per-paper learning progress, SQLite-backed. A paper isn't "done" until you
+ * write your own takeaway (Product audit #5: anti-graveyard); completed
+ * takeaways surface as concepts to revisit.
+ */
 
 export interface Progress {
   id: string;
@@ -17,17 +17,22 @@ export interface Progress {
   updatedAt: number;
 }
 
-const store = createLocalStore<Progress>("engram-os:learning:v1");
+interface ProgressRow {
+  id: string;
+  status: ReadStatus;
+  takeaway: string;
+  updated_at: number;
+}
 
-/** Minimum bar for an own-words takeaway to count as understanding. */
-export const MIN_TAKEAWAY = 12;
-
-export function canComplete(takeaway: string): boolean {
-  return takeaway.trim().length >= MIN_TAKEAWAY;
+function rowToProgress(r: ProgressRow): Progress {
+  return { id: r.id, status: r.status, takeaway: r.takeaway, updatedAt: r.updated_at };
 }
 
 export function getProgress(id: string): Progress | null {
-  return store.all().find((p) => p.id === id) ?? null;
+  const row = getDb()
+    .prepare<[string], ProgressRow>(`SELECT * FROM learning_progress WHERE id = ?`)
+    .get(id);
+  return row ? rowToProgress(row) : null;
 }
 
 function upsert(id: string, patch: Partial<Omit<Progress, "id" | "updatedAt">>): Progress {
@@ -38,7 +43,16 @@ function upsert(id: string, patch: Partial<Omit<Progress, "id" | "updatedAt">>):
     takeaway: patch.takeaway ?? existing?.takeaway ?? "",
     updatedAt: Date.now(),
   };
-  store.set([next, ...store.all().filter((p) => p.id !== id)]);
+  getDb()
+    .prepare(
+      `INSERT INTO learning_progress (id, status, takeaway, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         status     = excluded.status,
+         takeaway   = excluded.takeaway,
+         updated_at = excluded.updated_at`,
+    )
+    .run(next.id, next.status, next.takeaway, next.updatedAt);
   return next;
 }
 
@@ -61,12 +75,10 @@ export function markDone(id: string, takeaway: string): Progress | null {
 
 /** Takeaways from completed items become concepts to revisit / dream fuel. */
 export function completedTakeaways(): { id: string; takeaway: string }[] {
-  return store
-    .all()
-    .filter((p) => p.status === "done" && p.takeaway)
-    .map((p) => ({ id: p.id, takeaway: p.takeaway }));
-}
-
-export function subscribeLearning(fn: () => void): () => void {
-  return store.subscribe(fn);
+  const rows = getDb()
+    .prepare<[], { id: string; takeaway: string }>(
+      `SELECT id, takeaway FROM learning_progress WHERE status = 'done' AND takeaway != '' ORDER BY updated_at DESC`,
+    )
+    .all();
+  return rows;
 }

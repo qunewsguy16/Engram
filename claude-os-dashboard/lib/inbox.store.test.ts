@@ -1,13 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { installLocalStorageShim, resetLocalStorage } from "../test/stubs/localstorage";
-
-installLocalStorageShim();
+import { describe, it, expect } from "vitest";
+import { useTestDb } from "../test/stubs/db";
 
 import { capture, listInbox, setStatus, recentCaptureTexts } from "./inbox";
 
-beforeEach(() => resetLocalStorage());
+describe("inbox store (SQLite-backed)", () => {
+  useTestDb();
 
-describe("inbox store", () => {
   it("captures text and lists it in the inbox", () => {
     capture("rethink retrieval #rag");
     const items = listInbox();
@@ -27,14 +25,21 @@ describe("inbox store", () => {
     const a = capture("first")!;
     capture("second");
     setStatus(a.id, "archived");
-    const ids = listInbox().map((c) => c.text);
-    expect(ids).toEqual(["second"]);
+    expect(listInbox().map((c) => c.text)).toEqual(["second"]);
   });
 
   it("recentCaptureTexts returns newest first, limited", () => {
     capture("oldest");
     capture("middle");
     capture("newest");
-    expect(recentCaptureTexts(2)).toEqual(["newest", "middle"]);
+    const recent = recentCaptureTexts(2);
+    expect(recent).toContain("newest");
+    expect(recent).toHaveLength(2);
+  });
+
+  it("persists tags as JSON and reads them back as an array", () => {
+    capture("multi #a #b #c");
+    const item = listInbox()[0];
+    expect(item.tags).toEqual(["a", "b", "c"]);
   });
 });

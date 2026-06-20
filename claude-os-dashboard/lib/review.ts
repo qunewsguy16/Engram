@@ -1,30 +1,47 @@
-/**
- * End-of-day review — the half of the loop that makes the dashboard useful
- * rather than decorative (Product audit #2). It records whether the day's one
- * thing got done and one sentence of what was learned; those entries feed back
- * into the next /dream. One entry per day, upserted by date.
- */
-import { createLocalStore } from "./localStore";
+import "server-only";
+import { getDb } from "./db";
 import { dayKey } from "./date";
+import type { ReviewEntry } from "./reviewTypes";
 
-export interface ReviewEntry {
-  date: string; // YYYY-MM-DD (local)
-  oneThingDone: boolean | null;
+export { type ReviewEntry } from "./reviewTypes";
+
+/**
+ * End-of-day review, SQLite-backed. One upserted row per local date. The
+ * `learned` line feeds the next /dream; the streak rewards consistency
+ * without breaking when today is still pending.
+ */
+
+interface ReviewRow {
+  date: string;
+  one_thing_done: 0 | 1 | null;
   learned: string;
   blockers: string;
-  updatedAt: number;
+  updated_at: number;
 }
 
-const store = createLocalStore<ReviewEntry>("engram-os:review:v1");
+function rowToReview(r: ReviewRow): ReviewEntry {
+  return {
+    date: r.date,
+    oneThingDone: r.one_thing_done === null ? null : Boolean(r.one_thing_done),
+    learned: r.learned,
+    blockers: r.blockers,
+    updatedAt: r.updated_at,
+  };
+}
 
-/** YYYY-MM-DD local key. Re-exported from lib/date for backwards-compat. */
 export const todayKey = dayKey;
 
-export function getReview(date = todayKey()): ReviewEntry | null {
-  return store.all().find((r) => r.date === date) ?? null;
+export function getReview(date: string = dayKey()): ReviewEntry | null {
+  const row = getDb()
+    .prepare<[string], ReviewRow>(`SELECT * FROM reviews WHERE date = ?`)
+    .get(date);
+  return row ? rowToReview(row) : null;
 }
 
-export function saveReview(patch: Partial<Omit<ReviewEntry, "date" | "updatedAt">>, date = todayKey()): ReviewEntry {
+export function saveReview(
+  patch: Partial<Omit<ReviewEntry, "date" | "updatedAt">>,
+  date: string = dayKey(),
+): ReviewEntry {
   const existing = getReview(date);
   const entry: ReviewEntry = {
     date,
@@ -33,32 +50,38 @@ export function saveReview(patch: Partial<Omit<ReviewEntry, "date" | "updatedAt"
     blockers: patch.blockers ?? existing?.blockers ?? "",
     updatedAt: Date.now(),
   };
-  const rest = store.all().filter((r) => r.date !== date);
-  store.set([entry, ...rest]);
+  const oneThingDoneCell = entry.oneThingDone === null ? null : entry.oneThingDone ? 1 : 0;
+  getDb()
+    .prepare(
+      `INSERT INTO reviews (date, one_thing_done, learned, blockers, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(date) DO UPDATE SET
+         one_thing_done = excluded.one_thing_done,
+         learned        = excluded.learned,
+         blockers       = excluded.blockers,
+         updated_at     = excluded.updated_at`,
+    )
+    .run(entry.date, oneThingDoneCell, entry.learned, entry.blockers, entry.updatedAt);
   return entry;
 }
 
 export function listRecentReviews(limit = 7): ReviewEntry[] {
-  return store
-    .all()
-    .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .slice(0, limit);
+  const rows = getDb()
+    .prepare<[number], ReviewRow>(`SELECT * FROM reviews ORDER BY date DESC LIMIT ?`)
+    .all(limit);
+  return rows.map(rowToReview);
 }
 
 /** Consecutive days reviewed ending today (or yesterday if today isn't done yet). */
-export function reviewStreak(now = new Date()): number {
-  const done = new Set(store.all().map((r) => r.date));
+export function reviewStreak(now: Date = new Date()): number {
+  const rows = getDb().prepare<[], { date: string }>(`SELECT date FROM reviews`).all();
+  const done = new Set(rows.map((r) => r.date));
   let streak = 0;
   const cursor = new Date(now);
-  // Allow today to be pending without breaking the streak.
-  if (!done.has(todayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
-  while (done.has(todayKey(cursor))) {
+  if (!done.has(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+  while (done.has(dayKey(cursor))) {
     streak++;
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
-}
-
-export function subscribeReviews(fn: () => void): () => void {
-  return store.subscribe(fn);
 }

@@ -1,22 +1,12 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { Check, Circle } from "lucide-react";
-import { getReview, subscribeReviews } from "@/lib/review";
+import { getReview } from "@/lib/review";
 
 /**
- * Client island inside the (server-rendered) Today widget: reflects whether
- * today's one thing was marked done in the review. Makes the loop visible on
- * the main screen — the dashboard records an outcome, not just a plan.
+ * Reflects whether today's one thing was marked done in the review. Server
+ * component reading SQLite; re-renders on revalidatePath after save.
  */
 export function OneThingStatus() {
-  const [done, setDone] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const sync = () => setDone(getReview()?.oneThingDone ?? null);
-    sync();
-    return subscribeReviews(sync);
-  }, []);
+  const done = getReview()?.oneThingDone ?? null;
 
   if (done === true) {
     return (

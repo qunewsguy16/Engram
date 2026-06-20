@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseCapture } from "./inbox";
+import { parseCapture } from "./parseCapture";
 
 describe("parseCapture", () => {
   it("extracts inline #tags and returns the cleaned text", () => {

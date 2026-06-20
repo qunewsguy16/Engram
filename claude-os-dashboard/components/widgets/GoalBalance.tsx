@@ -1,15 +1,15 @@
-"use client";
-
 import { Scale, AlertCircle } from "lucide-react";
 import { profile, habitStats } from "@/lib/profile";
-import { completedTakeaways, subscribeLearning } from "@/lib/learningProgress";
-import { listRecentReviews, subscribeReviews } from "@/lib/review";
+import { completedTakeaways } from "@/lib/learningProgress";
+import { listRecentReviews } from "@/lib/review";
 import { buildGoalBalance } from "@/lib/goalWeighting";
-import { useStoreSync } from "@/lib/useStoreSync";
 
-function compute() {
+export function GoalBalance() {
   // Habit adherence routed to each habit's goal (mapping lives on the habit).
-  const contributions = profile.habits.map((h) => ({ goalId: h.goalId, weight: habitStats(h).rate.done }));
+  const contributions = profile.habits.map((h) => ({
+    goalId: h.goalId,
+    weight: habitStats(h).rate.done,
+  }));
 
   // Learning output: completed takeaways are heavier (output, not intake).
   contributions.push({ goalId: "learn-ml", weight: completedTakeaways().length * 2 });
@@ -18,12 +18,7 @@ function compute() {
   const shipped = listRecentReviews(7).filter((r) => r.oneThingDone === true).length;
   contributions.push({ goalId: "ship-side", weight: shipped });
 
-  return buildGoalBalance(profile.goals, contributions);
-}
-
-export function GoalBalance() {
-  useStoreSync(subscribeReviews, subscribeLearning);
-  const balance = compute();
+  const balance = buildGoalBalance(profile.goals, contributions);
   const maxScore = Math.max(0, ...balance.activities.map((a) => a.score));
   const empty = maxScore === 0;
 

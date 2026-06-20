@@ -23,10 +23,18 @@ All slices ship with unit tests (64 passing) and green CI on PR #1.
 - ✅ Learning: takeaway-gated completion; takeaways become concepts.
 - ✅ Memory: semantic (brute-force cosine) path behind the flag, keyword default.
 - ✅ First-run onboarding checklist.
+- ✅ Goal-balance widget (under-served-goal callout).
+- ✅ Full connector set via `defineConnector` (GitHub/GCal/Todoist/Gmail/Notion/
+  Drive); registry is a token table; all gated by `FEATURE_REAL_CONNECTORS`.
+- ✅ **SQLite persistence** (DECISIONS.md raw better-sqlite3, no ORM): all three
+  client stores (inbox/review/learning) now persist to `data/engram-os.sqlite`
+  via server-only modules + server actions. Widgets that read data are now RSC
+  and refresh via `revalidatePath` after mutations. The `useStoreSync` hook
+  and `localStore.ts` are gone — server data flows top-down.
 
-Not yet built (next): live wiring of the remaining connectors (needs the app
-to hold credentials at runtime), SQLite persistence (stores are localStorage),
-live `/dream` (flag off; mock until a key is set), goal-weighting flag.
+Not yet built (next): live `/dream` wiring (flag off; mock until a key is set;
+candidate for the `claude-api` skill), dream-run persistence into the
+`dream_runs` table that's already provisioned.
 
 ## Verdict in one line
 

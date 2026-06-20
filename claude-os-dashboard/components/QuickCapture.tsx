@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
-import { capture } from "@/lib/inbox";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Sparkles, Loader2 } from "lucide-react";
+import { captureAction } from "@/app/actions/inbox";
 
 /**
  * Global quick-capture modal. ⌘⇧N (or Ctrl+Shift+N) opens; Esc cancels;
@@ -12,6 +12,7 @@ import { capture } from "@/lib/inbox";
 export function QuickCapture() {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
+  const [pending, start] = useTransition();
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -34,7 +35,11 @@ export function QuickCapture() {
   }, [open]);
 
   function submit() {
-    if (capture(text)) setOpen(false);
+    if (!text.trim()) return;
+    start(async () => {
+      const item = await captureAction(text);
+      if (item) setOpen(false);
+    });
   }
 
   return (
@@ -70,7 +75,10 @@ export function QuickCapture() {
             />
             <div className="flex items-center justify-between px-4 py-2 border-t border-border text-xs text-muted">
               <span>Lands in your inbox · #tag inferred</span>
-              <button onClick={submit} className="btn-primary" disabled={!text.trim()}>Save</button>
+              <button onClick={submit} className="btn-primary" disabled={!text.trim() || pending}>
+                {pending ? <Loader2 size={14} className="animate-spin" /> : null}
+                Save
+              </button>
             </div>
           </div>
         </div>
