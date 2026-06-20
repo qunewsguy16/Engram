@@ -51,5 +51,3 @@ export const profile = {
     { id: "review-notes", label: "5m end-of-day review", log: [true, false, true, true, true, false, false, true, true, false, true, true, true, false] },
   ] satisfies Habit[],
 };
-
-export type Profile = typeof profile;
