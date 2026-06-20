@@ -13,6 +13,8 @@
 export interface Habit {
   id: string;
   label: string;
+  /** Which goal this habit feeds (id from profile.goals). Drives goal-balance. */
+  goalId: string;
   /** Most recent first: true=done, false=missed. Length = lookback window. */
   log: boolean[];
 }
@@ -45,9 +47,9 @@ export const profile = {
   ],
   habits: [
     // Most recent first. v1 is seeded; persistence comes with the loop skeleton.
-    { id: "deep-work", label: "90m deep work", log: [true, true, false, true, true, true, false, true, true, true, false, true, true, true] },
-    { id: "read-paper", label: "Read + 3-sentence takeaway", log: [true, false, true, true, false, true, true, true, false, true, true, false, true, true] },
-    { id: "ship-commit", label: "Ship 1 commit", log: [true, true, true, true, true, true, true, false, true, true, true, true, true, true] },
-    { id: "review-notes", label: "5m end-of-day review", log: [true, false, true, true, true, false, false, true, true, false, true, true, true, false] },
+    { id: "deep-work", label: "90m deep work", goalId: "daily-focus", log: [true, true, false, true, true, true, false, true, true, true, false, true, true, true] },
+    { id: "read-paper", label: "Read + 3-sentence takeaway", goalId: "learn-ml", log: [true, false, true, true, false, true, true, true, false, true, true, false, true, true] },
+    { id: "ship-commit", label: "Ship 1 commit", goalId: "ship-side", log: [true, true, true, true, true, true, true, false, true, true, true, true, true, true] },
+    { id: "review-notes", label: "5m end-of-day review", goalId: "daily-focus", log: [true, false, true, true, true, false, false, true, true, false, true, true, true, false] },
   ] satisfies Habit[],
 };

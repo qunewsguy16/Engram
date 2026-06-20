@@ -5,6 +5,7 @@ import { Check, Circle, X, Rocket } from "lucide-react";
 import { recentCaptureTexts, subscribeInbox } from "@/lib/inbox";
 import { getReview, reviewStreak, subscribeReviews } from "@/lib/review";
 import { completedTakeaways, subscribeLearning } from "@/lib/learningProgress";
+import { useStoreSync } from "@/lib/useStoreSync";
 
 const DISMISS_KEY = "engram-os:onboarding-dismissed:v1";
 
@@ -15,13 +16,10 @@ const DISMISS_KEY = "engram-os:onboarding-dismissed:v1";
  */
 export function Onboarding() {
   const [dismissed, setDismissed] = useState(true); // assume hidden until mounted (SSR-safe)
-  const [, force] = useState(0);
+  useStoreSync(subscribeInbox, subscribeReviews, subscribeLearning);
 
   useEffect(() => {
     setDismissed(window.localStorage.getItem(DISMISS_KEY) === "1");
-    const rerender = () => force((n) => n + 1);
-    const unsubs = [subscribeInbox(rerender), subscribeReviews(rerender), subscribeLearning(rerender)];
-    return () => unsubs.forEach((u) => u());
   }, []);
 
   if (dismissed) return null;

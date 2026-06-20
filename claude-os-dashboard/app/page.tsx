@@ -8,6 +8,7 @@ import { Learning } from "@/components/widgets/Learning";
 import { TasksCalendar } from "@/components/widgets/TasksCalendar";
 import { Inbox } from "@/components/widgets/Inbox";
 import { WeeklyDigest } from "@/components/widgets/WeeklyDigest";
+import { GoalBalance } from "@/components/widgets/GoalBalance";
 import { ConnectorsFooter } from "@/components/ConnectorsFooter";
 
 export default function Page() {
@@ -26,6 +27,7 @@ export default function Page() {
           <Memory />
           <Learning />
           <WeeklyDigest />
+          <GoalBalance />
         </aside>
       </div>
       <ConnectorsFooter />

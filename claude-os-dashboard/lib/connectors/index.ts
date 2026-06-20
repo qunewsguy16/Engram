@@ -5,6 +5,8 @@ import { githubConnector, type GithubSnapshot } from "./github";
 import { gcalConnector } from "./gcal";
 import { todoistConnector } from "./todoist";
 import { gmailConnector } from "./gmail";
+import { notionConnector } from "./notion";
+import { driveConnector } from "./drive";
 import { flag } from "../flags";
 
 /**
@@ -35,10 +37,9 @@ function mockConnector(
   };
 }
 
-// Engram RAG + Drive stay mock until a feature needs them.
+// Engram RAG stays mock until a feature needs it (no public API to hit).
 const mocks: Connector<unknown>[] = [
   mockConnector({ id: "engram-rag", name: "Engram RAG", category: "memory" }, "connected", "428 notes indexed", 0),
-  mockConnector({ id: "gdrive", name: "Google Drive", category: "notes" }, "disconnected", "Click to connect", 0),
 ];
 
 function makeGithub() {
@@ -52,13 +53,18 @@ function makeGithub() {
 /** Build the live registry, reading env at call time (not import). */
 export function getConnectors(): Connector<unknown>[] {
   const enabled = flag("FEATURE_REAL_CONNECTORS");
+  const live = [
+    [gcalConnector, process.env.GOOGLE_CALENDAR_TOKEN],
+    [todoistConnector, process.env.TODOIST_TOKEN],
+    [gmailConnector, process.env.GMAIL_TOKEN],
+    [notionConnector, process.env.NOTION_TOKEN],
+    [driveConnector, process.env.GOOGLE_DRIVE_TOKEN],
+  ] as const;
   return [
-    makeGithub() as Connector<unknown>,
-    gcalConnector({ enabled, token: process.env.GOOGLE_CALENDAR_TOKEN }) as Connector<unknown>,
-    todoistConnector({ enabled, token: process.env.TODOIST_TOKEN }) as Connector<unknown>,
-    gmailConnector({ enabled, token: process.env.GMAIL_TOKEN }) as Connector<unknown>,
+    makeGithub(),
+    ...live.map(([make, token]) => make({ enabled, token })),
     ...mocks,
-  ];
+  ] as Connector<unknown>[];
 }
 
 /** Typed accessor for widgets that want live GitHub data; null when off/erroring. */
