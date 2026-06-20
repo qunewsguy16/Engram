@@ -7,6 +7,7 @@ import { Projects } from "@/components/widgets/Projects";
 import { Learning } from "@/components/widgets/Learning";
 import { TasksCalendar } from "@/components/widgets/TasksCalendar";
 import { Inbox } from "@/components/widgets/Inbox";
+import { WeeklyDigest } from "@/components/widgets/WeeklyDigest";
 import { ConnectorsFooter } from "@/components/ConnectorsFooter";
 
 export default function Page() {
@@ -24,6 +25,7 @@ export default function Page() {
           <Inbox />
           <Memory />
           <Learning />
+          <WeeklyDigest />
         </aside>
       </div>
       <ConnectorsFooter />

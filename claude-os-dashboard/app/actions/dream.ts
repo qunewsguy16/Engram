@@ -24,8 +24,10 @@ export interface ClientSignals {
  * MCP-backed reads (yesterday's commits, completed tasks, edited notes).
  */
 export async function generateDream(client?: ClientSignals): Promise<{ dream: Dream; source: "live" | "mock" }> {
-  const captureNotes = (client?.captures ?? []).map((t) => ({ title: t }));
-  const learningNotes = (client?.learnings ?? []).map((t) => ({ title: `Learned: ${t}` }));
+  // Cap client-supplied input (security review #1: bound the public action).
+  const cap = (xs: string[] = [], n: number) => xs.slice(0, n).map((t) => t.slice(0, 500));
+  const captureNotes = cap(client?.captures, 50).map((title) => ({ title }));
+  const learningNotes = cap(client?.learnings, 20).map((t) => ({ title: `Learned: ${t}` }));
 
   const raw: RawSignals = {
     tasks: tasks.filter((t) => t.due === "today").map((t) => ({ content: t.content })),

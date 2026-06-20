@@ -2,6 +2,7 @@ import "server-only";
 import { DreamSchema, type Dream, type MemoryBlob } from "./schema";
 import { renderBlob } from "./reduce";
 import { flag } from "../flags";
+import { canSpend, recordSpend } from "./budget";
 
 /**
  * runDream: consolidate yesterday's signals into one grounded, actionable Dream.
@@ -95,9 +96,11 @@ async function callClaude(blob: MemoryBlob): Promise<Dream> {
 }
 
 export async function runDream(blob: MemoryBlob): Promise<{ dream: Dream; source: "live" | "mock" }> {
-  if (flag("FEATURE_DREAM_LIVE") && process.env.ANTHROPIC_API_KEY) {
+  if (flag("FEATURE_DREAM_LIVE") && process.env.ANTHROPIC_API_KEY && canSpend()) {
     try {
-      return { dream: await callClaude(blob), source: "live" };
+      const dream = await callClaude(blob);
+      recordSpend();
+      return { dream, source: "live" };
     } catch {
       // Degrade gracefully rather than failing the request.
     }

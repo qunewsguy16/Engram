@@ -5,6 +5,7 @@
  * into the next /dream. One entry per day, upserted by date.
  */
 import { createLocalStore } from "./localStore";
+import { dayKey } from "./date";
 
 export interface ReviewEntry {
   date: string; // YYYY-MM-DD (local)
@@ -16,9 +17,8 @@ export interface ReviewEntry {
 
 const store = createLocalStore<ReviewEntry>("engram-os:review:v1");
 
-export function todayKey(d = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+/** YYYY-MM-DD local key. Re-exported from lib/date for backwards-compat. */
+export const todayKey = dayKey;
 
 export function getReview(date = todayKey()): ReviewEntry | null {
   return store.all().find((r) => r.date === date) ?? null;

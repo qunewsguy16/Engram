@@ -1,5 +1,10 @@
+import "server-only";
 import type { Connector, Health, Result } from "./types";
 import { ok, fail } from "./types";
+
+// owner/repo only — prevents path/SSRF injection if `repo` ever becomes
+// user-supplied rather than operator env.
+const REPO_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
 /**
  * Reference live connector. The other six follow this exact shape:
@@ -36,11 +41,15 @@ export function githubConnector(deps: GithubDeps = {}): Connector<GithubSnapshot
 
   async function snapshot(): Promise<GithubSnapshot> {
     if (!deps.token) throw new Error("missing GITHUB_TOKEN");
+    if (!REPO_RE.test(repo)) throw new Error("invalid repo");
     const headers = { Authorization: `Bearer ${deps.token}`, Accept: "application/vnd.github+json" };
-    const prRes = await f(`https://api.github.com/repos/${repo}/pulls?state=open&per_page=100`, { headers });
+    // Independent reads — fire together rather than serially.
+    const [prRes, cRes] = await Promise.all([
+      f(`https://api.github.com/repos/${repo}/pulls?state=open&per_page=100`, { headers }),
+      f(`https://api.github.com/repos/${repo}/commits?per_page=20`, { headers }),
+    ]);
     if (!prRes.ok) throw new Error(`GitHub PRs ${prRes.status}`);
     const prs = (await prRes.json()) as PR[];
-    const cRes = await f(`https://api.github.com/repos/${repo}/commits?per_page=20`, { headers });
     const recentCommits = cRes.ok ? ((await cRes.json()) as unknown[]).length : 0;
     return {
       openPRs: prs.length,

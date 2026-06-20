@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * Embeddings interface + storage helpers. Pure functions only (no DB yet).
  *
