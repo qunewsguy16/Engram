@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { useTestDb } from "../../test/stubs/db";
 import { generateDream } from "./dream";
 import { capture } from "@/lib/inbox";
 import { saveReview } from "@/lib/review";
+import { latestDream, listRecentDreams } from "@/lib/dreamRuns";
 import { DreamSchema } from "@/lib/ai/schema";
+
+// next/cache's revalidatePath is a no-op outside a Next request.
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 describe("generateDream action", () => {
   useTestDb();
@@ -21,5 +25,15 @@ describe("generateDream action", () => {
     const { dream } = await generateDream();
     expect(() => DreamSchema.parse(dream)).not.toThrow();
     expect(dream.oneThing.length).toBeGreaterThan(0);
+  });
+
+  it("persists every run into dream_runs", async () => {
+    expect(latestDream()).toBeNull();
+    await generateDream();
+    await generateDream();
+    const recent = listRecentDreams(10);
+    expect(recent).toHaveLength(2);
+    expect(recent[0].source).toBe("mock");
+    expect(latestDream()?.id).toBe(recent[0].id);
   });
 });

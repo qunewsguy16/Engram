@@ -2,8 +2,15 @@ import { Target, Sun, Sparkles, AlertCircle } from "lucide-react";
 import { profile, habitStats } from "@/lib/profile";
 import { today } from "@/lib/today";
 import { OneThingStatus } from "@/components/OneThingStatus";
+import { latestDream } from "@/lib/dreamRuns";
 
 export function Today() {
+  // Today's one thing comes from the most recent /dream when available;
+  // lib/today.ts is the fallback until /dream has been run.
+  const last = latestDream();
+  const oneThing = last?.dream.oneThing ?? today.oneThing;
+  const fromDream = last !== null;
+
   return (
     <section className="card card-pad">
       {/* One thing — the forcing function above the fold. Visually dominant. */}
@@ -12,11 +19,11 @@ export function Today() {
           <div className="section-title"><Sun size={12} /> Today</div>
           <div className="mt-2 flex items-start gap-2">
             <Target size={20} className="text-accent flex-none mt-0.5" />
-            <h2 className="text-2xl font-semibold leading-tight">{today.oneThing}</h2>
+            <h2 className="text-2xl font-semibold leading-tight">{oneThing}</h2>
           </div>
           <div className="text-xs text-muted mt-1.5 flex items-center gap-1.5">
-            {today.source === "dream" ? (
-              <><Sparkles size={11} className="text-accent" /> from this morning&apos;s /dream</>
+            {fromDream ? (
+              <><Sparkles size={11} className="text-accent" /> from your latest /dream ({last.source})</>
             ) : (
               <>Edit this in <span className="font-mono">lib/today.ts</span> until /dream sets it</>
             )}

@@ -1,6 +1,7 @@
 import "server-only";
 import { getDb } from "./db";
 import { parseCapture } from "./parseCapture";
+import { uid } from "./uid";
 import type { Capture } from "./inboxTypes";
 
 export { parseCapture };
@@ -22,10 +23,6 @@ interface CaptureRow {
 
 function rowToCapture(r: CaptureRow): Capture {
   return { id: r.id, text: r.text, tags: JSON.parse(r.tags), capturedAt: r.captured_at, status: r.status };
-}
-
-function uid(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function listInbox(): Capture[] {

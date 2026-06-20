@@ -7,17 +7,18 @@ import { canSpend, recordSpend } from "./budget";
 /**
  * runDream: consolidate yesterday's signals into one grounded, actionable Dream.
  *
- * Gated by FEATURE_DREAM_LIVE. When off (default), returns a deterministic
- * mock that CONFORMS to DreamSchema, so the contract is exercised with no key
- * and no spend. When on, calls Claude and validates the output against the
- * schema, with one repair retry, then falls back to the mock — the app never
- * throws on a bad model response.
+ * Gated by FEATURE_DREAM_LIVE. Off (default): deterministic mock that conforms
+ * to DreamSchema — same contract, no key, no spend. On: Claude with the
+ * skill-correct API surface (`claude-opus-4-8`, adaptive thinking, structured
+ * outputs via output_config.format, prompt-cached system, streaming). Output
+ * is validated against DreamSchema as a defensive check; any failure
+ * (refusal, parse, schema) falls back to the mock — the app never throws.
  */
 
 export const DREAM_SYSTEM_PROMPT = [
   "You are the consolidation engine of a personal dashboard, inspired by memory",
   "consolidation during sleep. You receive a numbered list of signals from the",
-  "user's day (commits, tasks, notes, calendar, reading). Produce a concise,",
+  "user's day (commits, tasks, notes, calendar, reading) and produce a concise,",
   "grounded synthesis that points the user at the single highest-leverage thing",
   "to do next.",
   "",
@@ -25,11 +26,79 @@ export const DREAM_SYSTEM_PROMPT = [
   "one signal id (e.g. \"c3\", \"n7\") in its sourceIds. If you cannot ground a",
   "claim in a provided signal, OMIT it. Never invent specifics not in the signals.",
   "",
-  "Pick exactly one oneThing: the most important focus for today. Keep threads to",
-  "the few that matter. Only propose actions you are confident about; they are",
-  "shown as buttons the user clicks to confirm — you never execute them.",
-  "Respond with ONLY a JSON object matching the requested schema, no prose.",
+  "Pick exactly one oneThing: the single most important focus for today. Keep",
+  "threads to the few that matter. Only propose actions you are confident about;",
+  "they are shown as buttons the user clicks to confirm — you never execute them.",
 ].join("\n");
+
+/**
+ * JSON schema mirroring DreamSchema. structured-outputs limits apply: no
+ * minLength/maximum/recursion. Counts (e.g. "few threads") live in the prompt.
+ */
+const DREAM_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["oneThing", "threads", "suggestedActions", "openQuestions", "newConcepts"],
+  properties: {
+    oneThing: { type: "string" },
+    threads: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "body", "sourceIds"],
+        properties: {
+          title: { type: "string" },
+          body: { type: "string" },
+          sourceIds: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+    suggestedActions: {
+      type: "array",
+      items: {
+        anyOf: [
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["kind", "title", "sourceIds"],
+            properties: {
+              kind: { const: "todoist.create" },
+              title: { type: "string" },
+              due: { type: "string" },
+              sourceIds: { type: "array", items: { type: "string" } },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["kind", "noteId", "reason", "sourceIds"],
+            properties: {
+              kind: { const: "memory.pin" },
+              noteId: { type: "string" },
+              reason: { type: "string" },
+              sourceIds: { type: "array", items: { type: "string" } },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["kind", "title", "start", "durationMin", "sourceIds"],
+            properties: {
+              kind: { const: "calendar.block" },
+              title: { type: "string" },
+              start: { type: "string" },
+              durationMin: { type: "number" },
+              sourceIds: { type: "array", items: { type: "string" } },
+            },
+          },
+        ],
+      },
+    },
+    openQuestions: { type: "array", items: { type: "string" } },
+    newConcepts: { type: "array", items: { type: "string" } },
+  },
+} as const;
 
 export function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -67,32 +136,41 @@ export function buildMockDream(blob: MemoryBlob): Dream {
 }
 
 async function callClaude(blob: MemoryBlob): Promise<Dream> {
-  // Imported lazily so the module graph (and tests) don't require the key.
+  // Lazy import — keeps the module graph (and tests) free of the key dependency.
   const { anthropic, DREAM_MODEL } = await import("./client");
-  const user = `${renderBlob(blob)}\n\nReturn a JSON object with keys: oneThing (string), threads (array of {title, body, sourceIds[]}), suggestedActions (array of typed actions: todoist.create|memory.pin|calendar.block, each with sourceIds[]), openQuestions (string[]), newConcepts (string[]).`;
+  const user = `${renderBlob(blob)}\n\nReturn the dream as JSON matching the schema.`;
 
-  const send = (extra = "") =>
-    anthropic().messages.create({
-      model: DREAM_MODEL,
-      max_tokens: 2048,
-      system: DREAM_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: user + extra }],
-    });
+  // Stream because xhigh-effort runs can take minutes — non-streaming would
+  // timeout. .finalMessage() gives the assembled response when done.
+  const stream = anthropic().messages.stream({
+    model: DREAM_MODEL,
+    max_tokens: 16000,
+    system: [
+      // Cache the stable system prompt — saves on re-dreams within the 5-min TTL.
+      { type: "text", text: DREAM_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+    ],
+    thinking: { type: "adaptive", display: "summarized" },
+    output_config: {
+      effort: "high",
+      format: { type: "json_schema", schema: DREAM_JSON_SCHEMA },
+    } as unknown as Record<string, unknown>,
+    messages: [{ role: "user", content: user }],
+  } as unknown as Parameters<ReturnType<typeof anthropic>["messages"]["stream"]>[0]);
 
-  // NOTE: when ready, replace manual extract+validate with the SDK's
-  // structured-outputs helper (messages.parse + a zod output format).
-  let res = await send();
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const text = res.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("");
-    try {
-      return DreamSchema.parse(extractJson(text));
-    } catch {
-      if (attempt === 0) {
-        res = await send("\n\nYour previous reply was not valid JSON for the schema. Reply with ONLY the JSON object.");
-      }
-    }
+  const res = await stream.finalMessage();
+
+  if (res.stop_reason === "refusal") {
+    throw new Error("model refused");
   }
-  throw new Error("dream output failed schema validation");
+
+  // output_config.format guarantees the first text block is the JSON object.
+  // Defensive validation against the zod schema — schema/runtime drift is caught
+  // here and triggers the mock fallback in runDream.
+  const text = res.content
+    .filter((b) => b.type === "text")
+    .map((b) => (b as { text: string }).text)
+    .join("");
+  return DreamSchema.parse(extractJson(text));
 }
 
 export async function runDream(blob: MemoryBlob): Promise<{ dream: Dream; source: "live" | "mock" }> {
