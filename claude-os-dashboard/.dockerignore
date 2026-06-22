@@ -1,0 +1,19 @@
+# Keep the build context small + reproducible.
+node_modules
+.next
+out
+data
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.git
+.github
+README.md
+DECISIONS.md
+DEPLOY.md
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
