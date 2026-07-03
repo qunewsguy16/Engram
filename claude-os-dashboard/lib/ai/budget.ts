@@ -1,4 +1,5 @@
 import "server-only";
+import { dayKey } from "../date";
 
 /**
  * Soft daily spend guard for /dream (security review #1: DREAM_DAILY_BUDGET_USD
@@ -18,7 +19,8 @@ function budgetUsd(): number {
 }
 
 function rollover() {
-  const today = new Date().toISOString().slice(0, 10);
+  // Local-midnight rollover, consistent with the rest of the app (dayKey).
+  const today = dayKey();
   if (today !== day) {
     day = today;
     calls = 0;

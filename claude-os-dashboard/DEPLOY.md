@@ -8,6 +8,10 @@ Self-hosted, always-on, reachable from any device on your Tailscale tailnet at
 - DS423+ with **Container Manager** installed (Package Center → Container Manager).
 - **SSH enabled** on the NAS (Control Panel → Terminal & SNMP → "Enable SSH service").
 - **Tailscale** installed on the NAS (Package Center → Tailscale) and signed in to the same tailnet as your other devices. Magic DNS makes `mousedrops` resolve from any tailnet device.
+- **git on the NAS** — DSM does not ship git by default. Install **Git Server**
+  from Package Center (the package includes the `git` CLI; you don't need to
+  enable the server part), or skip git entirely: download the branch as a ZIP
+  from GitHub, upload via File Station, and build from that directory.
 
 ## One-time setup
 
@@ -82,8 +86,28 @@ If you'd rather use the Synology web UI:
 4. Optional: paste env vars in the "Environment" step.
 5. Build & start.
 
+## Security note (read once)
+
+The app has **no authentication** — by design, for a personal tailnet tool.
+The default compose config publishes port 3000 on **every** NAS interface,
+which includes your LAN. If anything untrusted shares your LAN (guests, IoT),
+either:
+
+- Bind to the Tailscale interface only — in `docker-compose.yml`, change the
+  port mapping to `"100.86.244.9:3000:3000"` (your NAS's tailnet IP). Then the
+  dashboard is reachable exclusively through Tailscale.
+- Or add a DSM firewall rule allowing TCP 3000 from the Tailscale subnet
+  (100.64.0.0/10) only.
+
+With `FEATURE_DREAM_LIVE=true`, reaching the dashboard also means being able
+to trigger Claude API calls on your key (capped by `DREAM_DAILY_BUDGET_USD`,
+default $1/day) — one more reason to keep it tailnet-only.
+
 ## Troubleshooting
 
+- **`docker compose` not recognized** — older Container Manager builds ship
+  the standalone binary instead of the plugin; use `sudo docker-compose up -d --build`
+  (hyphenated). Same flags, same behavior.
 - **Port 3000 already taken** — change `"3000:3000"` in `docker-compose.yml` to `"3030:3000"` (or any free host port). Tailscale URL becomes `http://mousedrops:3030`.
 - **DB looks empty after a redeploy** — confirm the volume mounted: `sudo docker volume inspect engram-data`. If the `Mountpoint` directory has the `.sqlite` files, the data is there.
 - **Live `/dream` returns mocks despite the flag** — `docker compose logs` will print a warning if the Anthropic key is missing or invalid. Confirm `.env` was loaded: `sudo docker compose config` shows the resolved values.
