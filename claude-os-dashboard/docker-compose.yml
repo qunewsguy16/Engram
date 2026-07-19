@@ -1,0 +1,41 @@
+# Run on a Synology DS423+ via Container Manager (or any Docker host).
+# See DEPLOY.md for the full setup.
+
+services:
+  dashboard:
+    container_name: engram-os
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: engram-os-dashboard:latest
+    restart: unless-stopped
+    ports:
+      # Default: listen on every NAS interface (LAN + tailnet). The app has no
+      # auth, so anyone who can reach port 3000 can read/write your data. To
+      # restrict to tailnet-only, bind to the NAS's Tailscale IP instead:
+      #   - "100.86.244.9:3000:3000"
+      - "3000:3000"
+    volumes:
+      # SQLite + WAL files live here; survive container rebuilds.
+      - engram-data:/data
+    environment:
+      # Feature flags + secrets. Either set inline or via an .env file
+      # (Docker Compose auto-loads `.env` from the same directory).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPO: ${GITHUB_REPO:-qunewsguy16/Engram}
+      GOOGLE_CALENDAR_TOKEN: ${GOOGLE_CALENDAR_TOKEN:-}
+      TODOIST_TOKEN: ${TODOIST_TOKEN:-}
+      GMAIL_TOKEN: ${GMAIL_TOKEN:-}
+      NOTION_TOKEN: ${NOTION_TOKEN:-}
+      GOOGLE_DRIVE_TOKEN: ${GOOGLE_DRIVE_TOKEN:-}
+      FEATURE_DREAM_LIVE: ${FEATURE_DREAM_LIVE:-false}
+      FEATURE_REAL_CONNECTORS: ${FEATURE_REAL_CONNECTORS:-false}
+      FEATURE_MEMORY_EMBEDDINGS: ${FEATURE_MEMORY_EMBEDDINGS:-false}
+      DREAM_DAILY_BUDGET_USD: ${DREAM_DAILY_BUDGET_USD:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+volumes:
+  engram-data:
+    name: engram-data
