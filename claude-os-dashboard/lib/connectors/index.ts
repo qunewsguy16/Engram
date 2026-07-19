@@ -3,7 +3,7 @@ import type { Category, Connector, ConnectorMeta, Health, Result } from "./types
 import { ok } from "./types";
 import { githubConnector, type GithubSnapshot } from "./github";
 import { gcalConnector } from "./gcal";
-import { todoistConnector } from "./todoist";
+import { todoistConnector, fetchTodoistData, type TodoistData } from "./todoist";
 import { gmailConnector } from "./gmail";
 import { notionConnector } from "./notion";
 import { driveConnector } from "./drive";
@@ -71,6 +71,20 @@ export function getConnectors(): Connector<unknown>[] {
 export async function githubSnapshot(): Promise<GithubSnapshot | null> {
   const r = await makeGithub().list();
   return r.ok && r.data[0] ? r.data[0] : null;
+}
+
+/**
+ * Live Todoist projects + tasks for the Projects and Up-next widgets.
+ * null when the connector is off, the token is missing, or the API errors —
+ * widgets fall back to mock. Never throws.
+ */
+export async function todoistData(): Promise<TodoistData | null> {
+  if (!flag("FEATURE_REAL_CONNECTORS") || !process.env.TODOIST_TOKEN) return null;
+  try {
+    return await fetchTodoistData(process.env.TODOIST_TOKEN);
+  } catch {
+    return null;
+  }
 }
 
 export interface ConnectorTile {

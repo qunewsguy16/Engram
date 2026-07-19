@@ -76,6 +76,33 @@ sudo docker compose up -d --build
 
 The `engram-data` named volume preserves your SQLite DB across rebuilds — captures, reviews, learning, and dream history all persist.
 
+## Connecting Todoist (real projects + tasks)
+
+Turns the **Projects** widget into your Todoist project list, and feeds the
+**Up next** priority list with your real tasks (due today / overdue, by
+priority). Your tasks are fetched live on the NAS and never committed anywhere.
+
+1. Get a Todoist API token: Todoist → **Settings → Integrations → Developer →
+   Copy API token** (a long hex string, *not* an OAuth token).
+2. In `~/engram-os/claude-os-dashboard` on the NAS, add it to `.env` (one line
+   at a time; the token has no expiry):
+   ```sh
+   echo 'TODOIST_TOKEN=your-token-here' >> .env
+   echo 'FEATURE_REAL_CONNECTORS=true' >> .env
+   ```
+3. Apply it:
+   ```sh
+   sudo docker compose up -d --force-recreate
+   ```
+
+The Projects widget header will read **"N from Todoist"** with a green live
+dot, and the Up-next priorities will show your real tasks. If the token is
+missing or wrong, both widgets silently fall back to the mock data — no errors.
+
+> Only your **active, non-inbox** Todoist projects that have tasks show as
+> cards, sorted by task count. Inbox tasks still appear in the priority list if
+> they're due/overdue.
+
 ## Container Manager UI (alternative to SSH)
 
 If you'd rather use the Synology web UI:
